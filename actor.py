@@ -12,7 +12,6 @@ from keras.layers import Conv2D, Flatten, Dense, Input, Lambda, concatenate
 from keras import backend as K
 import time
 
-
 class Actor:
     def __init__(self,
                  args,
@@ -56,16 +55,12 @@ class Actor:
         self.anealing_steps = anealing_steps
 
 
-
-
-
-
-
-
         self.env = gym.make(args.env_name)
+
 
         self.num = number
         self.num_actions = self.env.action_space.n
+
         self.t = 0
         self.repeated_action = 0
 
@@ -87,30 +82,30 @@ class Actor:
         self.buffer = []
         self.R = 0
 
-        # with tf.device("/cpu:0"):
-        self.s, self.q_values, q_network = self.build_network()
-        q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
-        #for i in range(len(q_network_weights)):
-        #    print(q_network_weights[i])
+        with tf.device("/cpu:0"):
+            self.s, self.q_values, q_network = self.build_network()
+            q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
+            #for i in range(len(q_network_weights)):
+            #    print(q_network_weights[i])
 
-        self.st, self.target_q_values, target_network = self.build_network()
-        target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
+            self.st, self.target_q_values, target_network = self.build_network()
+            target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
 
-        q_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_parameters"))
-        target_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_target_parameters"))
+            q_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_parameters"))
+            target_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_target_parameters"))
 
-        self.obtain_q_parameters = [q_network_weights[i].assign(q_parameters[i]) for i in range(len(q_parameters))]
-        self.obtain_target_parameters = [target_network_weights[i].assign(target_parameters[i]) for i in range(len(target_parameters))]
+            self.obtain_q_parameters = [q_network_weights[i].assign(q_parameters[i]) for i in range(len(q_parameters))]
+            self.obtain_target_parameters = [target_network_weights[i].assign(target_parameters[i]) for i in range(len(target_parameters))]
 
-        self.a, self.y, self.q, self.error = self.td_error_op()
+            self.a, self.y, self.q, self.error = self.td_error_op()
 
-        self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))
-        #self.sess = tf.InteractiveSession()
-        self.sess.run(tf.global_variables_initializer())
+            self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))
+            #self.sess = tf.InteractiveSession()
+            self.sess.run(tf.global_variables_initializer())
 
-        self.sess.run(self.obtain_q_parameters)
-        #print("first",self.s_[1])
-        self.sess.run(self.obtain_target_parameters)
+            self.sess.run(self.obtain_q_parameters)
+            #print("first",self.s_[1])
+            self.sess.run(self.obtain_target_parameters)
 
     def bubble_sort_parameters(self, arr):
         change = True
@@ -182,6 +177,7 @@ class Actor:
             else:
                 action = np.argmax(q[0])
             self.repeated_action = action
+
         return action, q[0]
     #
     # def get_action_at_test(self, state):
@@ -213,9 +209,32 @@ class Actor:
                 observation, _, _, _ = self.env.step(0)  # Do nothing
             state = self.get_initial_state(observation, last_observation)
             start = time.time()
+
+            # states = []
+            # same_state = 0
             while not terminal:
+
+                if self.t % 1000 ==0:
+                    print(self.num, 'alive.')
+
+                # states.append(observation)
+                # if self.t % 2000 == 0 and self.num == 2:
+                #     np.save('states',np.array(states))
+                #     print('save states')
+                # if (last_observation==observation).all():
+                #     same_state += 1
+                #     if same_state == 100:
+                #         print('Actor', self.num, 'died.')
+                #         return self.run()
+                #
+                # else:
+                #     same_state = 0
+
                 last_observation = observation
                 action, q = self.get_action_and_q(state)
+
+                # print(self.num, action)
+
                 observation, reward, terminal, _ = self.env.step(action)
                 reward = np.sign(reward)
                 #env.render()

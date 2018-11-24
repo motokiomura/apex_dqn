@@ -4,18 +4,33 @@ import multiprocessing as mp
 import tensorflow as tf
 import numpy as np
 import argparse
+import time
 
 from actor import Actor
 from leaner import Learner
 
 
-def actor_work(args, queue, num):#, server):
-    sess = tf.InteractiveSession()
+def actor_work(args, queue, num, config):#, server):
+    # with tf.device('/cpu:0'):
+    config = tf.ConfigProto(
+        # log_device_placement=True,
+        gpu_options=tf.GPUOptions(
+            per_process_gpu_memory_fraction=0#/(args.num_actors+1)
+        )
+    )
+    sess = tf.InteractiveSession(config=config)
     actor = Actor(args, queue, num, sess)
     actor.run()
 
-def leaner_work(args, queue):#, server):
-    sess = tf.InteractiveSession()
+def leaner_work(args, queue, config):#, server):
+    # with tf.device('/gpu:0'):
+    config = tf.ConfigProto(
+        # log_device_placement=True,
+        gpu_options=tf.GPUOptions(
+            per_process_gpu_memory_fraction=0.95#/(args.num_actors+1)
+        )
+    )
+    sess = tf.InteractiveSession(config=config)
     leaner = Learner(args, queue, sess)
     leaner.run()
 
@@ -57,12 +72,19 @@ if __name__ == '__main__':
         # cluster = tf.train.ClusterSpec({'local': ['localhost:2222', 'localhost:2223']})
         # server_learner = tf.train.Server(cluster, job_name='local', task_index=0)
 
+        config = tf.ConfigProto(
+            # log_device_placement=True,
+            gpu_options=tf.GPUOptions(
+                per_process_gpu_memory_fraction=0.95#/(args.num_actors+1)
+            )
+        )
+
         # with tf.device("/cpu:0"):
-        ps = [mp.Process(target=leaner_work, args=(args, queue))]
+        ps = [mp.Process(target=leaner_work, args=(args, queue, config))]
 
         for i in range(args.num_actors):
             # server_worker = tf.train.Server(cluster, job_name='local', task_index=i+1)
-            ps.append(mp.Process(target=actor_work, args=(args, queue, i)))
+            ps.append(mp.Process(target=actor_work, args=(args, queue, i, config)))
 
         for p in range(len(ps)):
             ps[p].start()

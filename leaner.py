@@ -84,9 +84,9 @@ class Learner:
                  target_update_interval=2500,
                  memory_remove_interval=100,
                  batch_size=32,
-                 lr=0.00025 / 4,
+                 lr=0.00025/4,
                  save_interval=50000,
-                 print_interval=3,
+                 print_interval=30,
                  max_queue_no_added=100
                  ):
 
@@ -116,8 +116,7 @@ class Learner:
 
         self.save_network_path = 'saved_networks/' + self.env_name
 
-        self.env = gym.make(args.env_name)
-        self.num_actions = self.env.action_space.n
+        self.num_actions = gym.make(args.env_name).action_space.n
 
         self.t = 0
         self.total_time = 0
@@ -133,7 +132,7 @@ class Learner:
 
         self.start = 0
 
-        # with tf.device('/cpu:0'):
+        # with tf.device('/gpu:0'):
         with tf.variable_scope("learner_parameters", reuse=True):
             self.s, self.q_values, q_network = self.build_network()
         q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
@@ -143,7 +142,7 @@ class Learner:
             self.st, self.target_q_values, target_network = self.build_network()
         target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
 
-        # Define target network update operation
+    # Define target network update operation
         self.update_target_network = [target_network_weights[i].assign(q_network_weights[i]) for i in range(len(target_network_weights))]
 
 
@@ -247,7 +246,7 @@ class Learner:
                 t_error = self.queue.get()
                 self.remote_memory.add(t_error[0], t_error[1])
 
-            print('rm len',self.remote_memory.length())
+            # print('rm len',self.remote_memory.length())
             time.sleep(2)
             return self.run()
 
@@ -272,7 +271,7 @@ class Learner:
                     self.remote_memory.add(t_error[0], t_error[1])
 
 
-            print('rm len',self.remote_memory.length())
+            # print('rm len',self.remote_memory.length())
             minibatch, idx_batch = self.remote_memory.sample(self.batch_size)
             #print("mini\n", minibatch[0][0])
 
