@@ -83,8 +83,11 @@ class Actor:
         self.R = 0
 
         with tf.device("/cpu:0"):
+
             self.s, self.q_values, q_network = self.build_network()
+
             q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
+
             #for i in range(len(q_network_weights)):
             #    print(q_network_weights[i])
 
@@ -101,9 +104,12 @@ class Actor:
 
             self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))
             #self.sess = tf.InteractiveSession()
+
             self.sess.run(tf.global_variables_initializer())
+            # self.sess.run(tf.report_uninitialized_variables())
 
             self.sess.run(self.obtain_q_parameters)
+
             #print("first",self.s_[1])
             self.sess.run(self.obtain_target_parameters)
 
@@ -137,10 +143,13 @@ class Actor:
 
     def build_network(self):
         l_input = Input(shape=(4,84,84))
-        conv2d = Conv2D(32,8,strides=(4,4),activation='relu', data_format="channels_first")(l_input)
-        conv2d = Conv2D(64,4,strides=(2,2),activation='relu', data_format="channels_first")(conv2d)
-        conv2d = Conv2D(64,3,strides=(1,1),activation='relu', data_format="channels_first")(conv2d)
-        fltn = Flatten()(conv2d)
+        # conv2d = Conv2D(32,8,strides=(4,4),activation='relu', data_format="channels_first")(l_input)
+        # conv2d = Conv2D(64,4,strides=(2,2),activation='relu', data_format="channels_first")(conv2d)
+        # conv2d = Conv2D(64,3,strides=(1,1),activation='relu', data_format="channels_first")(conv2d)
+        # fltn = Flatten()(conv2d)
+
+        fltn = Flatten()(l_input)
+
         v = Dense(512, activation='relu', name="dense_v1_"+str(self.num))(fltn)
         v = Dense(1, name="dense_v2_"+str(self.num))(v)
         adv = Dense(512, activation='relu', name="dense_adv1_"+str(self.num))(fltn)

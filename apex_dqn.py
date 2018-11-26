@@ -10,7 +10,7 @@ from actor import Actor
 from leaner import Learner
 
 
-def actor_work(args, queue, num, config):#, server):
+def actor_work(args, queue, num, target):#, server):
     # with tf.device('/cpu:0'):
     config = tf.ConfigProto(
         # log_device_placement=True,
@@ -18,11 +18,11 @@ def actor_work(args, queue, num, config):#, server):
             per_process_gpu_memory_fraction=0#/(args.num_actors+1)
         )
     )
-    sess = tf.InteractiveSession(config=config)
+    sess = tf.InteractiveSession()#target)#config=config)
     actor = Actor(args, queue, num, sess)
     actor.run()
 
-def leaner_work(args, queue, config):#, server):
+def leaner_work(args, queue, target):#, server):
     # with tf.device('/gpu:0'):
     config = tf.ConfigProto(
         # log_device_placement=True,
@@ -30,7 +30,7 @@ def leaner_work(args, queue, config):#, server):
             per_process_gpu_memory_fraction=0.95#/(args.num_actors+1)
         )
     )
-    sess = tf.InteractiveSession(config=config)
+    sess = tf.InteractiveSession()#target)#config=config)
     leaner = Learner(args, queue, sess)
     leaner.run()
 
@@ -39,7 +39,7 @@ def leaner_work(args, queue, config):#, server):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_actors', type=int, default=4)
-    parser.add_argument('--env_name', type=str, default='Breakout-v0')
+    parser.add_argument('--env_name', type=str, default='Alien-v0')
     parser.add_argument('--train', type=int, default=1)
     parser.add_argument('--load', type=int, default=0)
     parser.add_argument('--replay_memory_size', type=int, default=200000)
@@ -80,14 +80,14 @@ if __name__ == '__main__':
         )
 
         # with tf.device("/cpu:0"):
-        ps = [mp.Process(target=leaner_work, args=(args, queue, config))]
+        ps = [mp.Process(target=leaner_work, args=(args, queue, 1))]
 
         for i in range(args.num_actors):
             # server_worker = tf.train.Server(cluster, job_name='local', task_index=i+1)
-            ps.append(mp.Process(target=actor_work, args=(args, queue, i, config)))
+            ps.append(mp.Process(target=actor_work, args=(args, queue, i, 1)))
 
-        for p in range(len(ps)):
-            ps[p].start()
+        for p in ps:
+            p.start()
             print(p)
 
     # Test Mode
