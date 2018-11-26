@@ -10,7 +10,7 @@ from actor import Actor
 from leaner import Learner
 
 
-def actor_work(args, queue, num, target):#, server):
+def actor_work(args, queues, num):#, server):
     # with tf.device('/cpu:0'):
     config = tf.ConfigProto(
         # log_device_placement=True,
@@ -19,10 +19,10 @@ def actor_work(args, queue, num, target):#, server):
         )
     )
     sess = tf.InteractiveSession()#target)#config=config)
-    actor = Actor(args, queue, num, sess)
+    actor = Actor(args, queues, num, sess)
     actor.run()
 
-def leaner_work(args, queue, target):#, server):
+def leaner_work(args, queues):#, server):
     # with tf.device('/gpu:0'):
     config = tf.ConfigProto(
         # log_device_placement=True,
@@ -31,7 +31,7 @@ def leaner_work(args, queue, target):#, server):
         )
     )
     sess = tf.InteractiveSession()#target)#config=config)
-    leaner = Learner(args, queue, sess)
+    leaner = Learner(args, queues, sess)
     leaner.run()
 
 
@@ -67,7 +67,9 @@ if __name__ == '__main__':
 
 
     if args.train:
-        queue = mp.Queue(100)
+        transition_queue = mp.Queue(100)
+
+        param_queue = mp.Queue(args.num_actors)
 
         # cluster = tf.train.ClusterSpec({'local': ['localhost:2222', 'localhost:2223']})
         # server_learner = tf.train.Server(cluster, job_name='local', task_index=0)
@@ -80,11 +82,11 @@ if __name__ == '__main__':
         )
 
         # with tf.device("/cpu:0"):
-        ps = [mp.Process(target=leaner_work, args=(args, queue, 1))]
+        ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_queue)))]
 
         for i in range(args.num_actors):
             # server_worker = tf.train.Server(cluster, job_name='local', task_index=i+1)
-            ps.append(mp.Process(target=actor_work, args=(args, queue, i, 1)))
+            ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_queue), i)))
 
         for p in ps:
             p.start()

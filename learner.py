@@ -79,7 +79,7 @@ class Memory:
 class Learner:
     def __init__(self,
                  args,
-                 queue,
+                 queues,
                  sess,
                  target_update_interval=2500,
                  memory_remove_interval=100,
@@ -101,7 +101,8 @@ class Learner:
         # self.gamma = args.gamma
         self.gamma_n = args.gamma**args.n_step
 
-        self.queue = queue
+        self.queue = queues[0]
+        self.param_queue = queues[1]
 
         self.target_update_interval = target_update_interval
         self.memory_remove_interval = memory_remove_interval
@@ -135,26 +136,31 @@ class Learner:
         # with tf.device('/gpu:0'):
         with tf.variable_scope("learner_parameters", reuse=True):
             self.s, self.q_values, q_network = self.build_network()
-        q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
+        self.q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
 
         # Create target network
         with tf.variable_scope("learner_target_parameters", reuse=True):
             self.st, self.target_q_values, target_network = self.build_network()
-        target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
+        self.target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
 
     # Define target network update operation
-        self.update_target_network = [target_network_weights[i].assign(q_network_weights[i]) for i in range(len(target_network_weights))]
+        self.update_target_network = [self.target_network_weights[i].assign(self.q_network_weights[i]) for i in range(len(self.target_network_weights))]
 
 
         # Define loss and gradient update operation
-        self.a, self.y, self.error, self.loss, self.grad_update, self.gv, self.cl = self.build_training_op(q_network_weights)
+        self.a, self.y, self.error, self.loss, self.grad_update, self.gv, self.cl = self.build_training_op(self.q_network_weights)
 
         self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))# gpu_options=tf.GPUOptions(allow_growth=True)))
         #self.sess = tf.InteractiveSession()
         self.sess.run(tf.global_variables_initializer())
 
+        while not self.param_queue.full():
+            params = self.sess.run((self.q_network_weights, self.target_network_weights))
+            self.param_queue.put(params)
+        # print(self.param_queue.get())
+
         with tf.device("/cpu:0"):
-            self.saver = tf.train.Saver(q_network_weights)
+            self.saver = tf.train.Saver(self.q_network_weights)
 
         # Load network
         if self.load:
@@ -246,6 +252,10 @@ class Learner:
                 t_error = self.queue.get()
                 self.remote_memory.add(t_error[0], t_error[1])
 
+            while not self.param_queue.full():
+                params = self.sess.run((self.q_network_weights, self.target_network_weights))
+                self.param_queue.put(params)
+
             # print('rm len',self.remote_memory.length())
             time.sleep(2)
             return self.run()
@@ -269,6 +279,10 @@ class Learner:
                 while not self.queue.empty():
                     t_error = self.queue.get()
                     self.remote_memory.add(t_error[0], t_error[1])
+
+            while not self.param_queue.full():
+                params = self.sess.run((self.q_network_weights, self.target_network_weights))
+                self.param_queue.put(params)
 
 
             # print('rm len',self.remote_memory.length())
