@@ -90,14 +90,8 @@ class Actor:
 
         self.q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
 
-        #for i in range(len(q_network_weights)):
-        #    print(q_network_weights[i])
-
         self.st, self.target_q_values, target_network = self.build_network()
         self.target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
-
-        q_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_parameters"))
-        target_parameters = self.bubble_sort_parameters(tf.trainable_variables(scope="learner_target_parameters"))
 
         while self.param_queue.empty():
             print('Actor {} is wainting for learner params coming'.format(self.num))
@@ -109,12 +103,9 @@ class Actor:
 
         self.a, self.y, self.q, self.error = self.td_error_op()
 
-        self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))
-        #self.sess = tf.InteractiveSession()
+        self.sess = sess
 
         self.sess.run(tf.global_variables_initializer())
-        # self.sess.run(tf.report_uninitialized_variables())
-
 
         self.sess.run(obtain_q_parameters)
         self.sess.run(obtain_target_parameters)
@@ -223,32 +214,14 @@ class Actor:
             state = self.get_initial_state(observation, last_observation)
             start = time.time()
 
-            # states = []
-            # same_state = 0
             while not terminal:
-                # states.append(observation)
-                # if self.t % 2000 == 0 and self.num == 2:
-                #     np.save('states',np.array(states))
-                #     print('save states')
-                # if (last_observation==observation).all():
-                #     same_state += 1
-                #     if same_state == 100:
-                #         print('Actor', self.num, 'died.')
-                #         return self.run()
-                #
-                # else:
-                #     same_state = 0
-
                 last_observation = observation
                 action, q = self.get_action_and_q(state)
 
-                # print(self.num, action)
-
                 observation, reward, terminal, _ = self.env.step(action)
                 reward = np.sign(reward)
-                #env.render()
+                # self.env.render()
                 processed_observation = self.preprocess(observation, last_observation)
-                #state = agent.run(state, action, reward, terminal, processed_observation)
                 next_state = np.append(state[1:, :, :], processed_observation, axis=0)
 
                 self.buffer.append((state, action, reward, next_state, terminal, q))
@@ -325,11 +298,6 @@ class Actor:
                     obtain_target_parameters = [self.target_network_weights[i].assign(learner_params[1][i]) for i in range(len(self.target_network_weights))]
                     self.sess.run(obtain_q_parameters)
                     self.sess.run(obtain_target_parameters)
-
-
-
-                    # self.sess.run(self.obtain_q_parameters)
-                    # self.sess.run(self.obtain_target_parameters)
 
                 if self.anealing and self.anealing_steps + self.no_anealing_steps > self.t >= self.no_anealing_steps:
                     self.epsilon -= self.epsilon_step

@@ -7,30 +7,18 @@ import argparse
 import time
 
 from actor import Actor
-from leaner import Learner
+from learner import Learner
 
 
-def actor_work(args, queues, num):#, server):
+def actor_work(args, queues, num):
     # with tf.device('/cpu:0'):
-    config = tf.ConfigProto(
-        # log_device_placement=True,
-        gpu_options=tf.GPUOptions(
-            per_process_gpu_memory_fraction=0#/(args.num_actors+1)
-        )
-    )
-    sess = tf.InteractiveSession()#target)#config=config)
+    sess = tf.InteractiveSession()
     actor = Actor(args, queues, num, sess)
     actor.run()
 
-def leaner_work(args, queues):#, server):
+def leaner_work(args, queues):
     # with tf.device('/gpu:0'):
-    config = tf.ConfigProto(
-        # log_device_placement=True,
-        gpu_options=tf.GPUOptions(
-            per_process_gpu_memory_fraction=0.95#/(args.num_actors+1)
-        )
-    )
-    sess = tf.InteractiveSession()#target)#config=config)
+    sess = tf.InteractiveSession()
     leaner = Learner(args, queues, sess)
     leaner.run()
 
@@ -42,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--env_name', type=str, default='Alien-v0')
     parser.add_argument('--train', type=int, default=1)
     parser.add_argument('--load', type=int, default=0)
-    parser.add_argument('--replay_memory_size', type=int, default=200000)
+    parser.add_argument('--replay_memory_size', type=int, default=2000000)
     parser.add_argument('--initial_memory_size', type=int, default=20000, help='Learner waits until RB stores this number of transition.')
     parser.add_argument('--num_episodes', type=int, default=10000, help='Number of episodes each agent plays')
     parser.add_argument('--frame_width', type=int, default=84)
@@ -53,44 +41,26 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if args.train:
+        assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
 
-    # from tensorflow.python.client import device_lib
-    # print(device_lib.list_local_devices())
-
-    # if args.train:
-    #     assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
-    #
-    # if not args.load_network:
-    #     assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
-
-
-
+    if not args.load:
+        assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
 
     if args.train:
         transition_queue = mp.Queue(100)
 
         param_queue = mp.Queue(args.num_actors)
 
-        # cluster = tf.train.ClusterSpec({'local': ['localhost:2222', 'localhost:2223']})
-        # server_learner = tf.train.Server(cluster, job_name='local', task_index=0)
-
-        config = tf.ConfigProto(
-            # log_device_placement=True,
-            gpu_options=tf.GPUOptions(
-                per_process_gpu_memory_fraction=0.95#/(args.num_actors+1)
-            )
-        )
-
         # with tf.device("/cpu:0"):
         ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_queue)))]
 
         for i in range(args.num_actors):
-            # server_worker = tf.train.Server(cluster, job_name='local', task_index=i+1)
             ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_queue), i)))
 
         for p in ps:
             p.start()
-            print(p)
+            time.sleep(0.5)
 
     # Test Mode
     # else:

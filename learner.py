@@ -86,7 +86,7 @@ class Learner:
                  batch_size=32,
                  lr=0.00025/4,
                  save_interval=50000,
-                 print_interval=30,
+                 print_interval=100,
                  max_queue_no_added=100
                  ):
 
@@ -143,21 +143,19 @@ class Learner:
             self.st, self.target_q_values, target_network = self.build_network()
         self.target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
 
-    # Define target network update operation
+        # Define target network update operation
         self.update_target_network = [self.target_network_weights[i].assign(self.q_network_weights[i]) for i in range(len(self.target_network_weights))]
 
 
         # Define loss and gradient update operation
-        self.a, self.y, self.error, self.loss, self.grad_update, self.gv, self.cl = self.build_training_op(self.q_network_weights)
+        self.a, self.y, self.error_abs, self.loss, self.grad_update, self.gv, self.cl = self.build_training_op(self.q_network_weights)
 
-        self.sess = sess#tf.InteractiveSession()#server.target)#config=tf.ConfigProto(log_device_placement=True))# gpu_options=tf.GPUOptions(allow_growth=True)))
-        #self.sess = tf.InteractiveSession()
+        self.sess = sess
         self.sess.run(tf.global_variables_initializer())
 
         while not self.param_queue.full():
             params = self.sess.run((self.q_network_weights, self.target_network_weights))
             self.param_queue.put(params)
-        # print(self.param_queue.get())
 
         with tf.device("/cpu:0"):
             self.saver = tf.train.Saver(self.q_network_weights)
@@ -204,6 +202,14 @@ class Learner:
 
         return s, q_values, model
 
+    def huber_loss(self, x, delta=1.0):
+        return tf.where(
+            tf.abs(x) < delta,
+            tf.square(x) * 0.5,
+            delta * (tf.abs(x) - 0.5 * delta)
+        )
+
+
     def build_training_op(self, q_network_weights):
         a = tf.placeholder(tf.int64, [None])
         y = tf.placeholder(tf.float32, [None])
@@ -215,20 +221,16 @@ class Learner:
         q_value = tf.reduce_sum(tf.multiply(self.q_values, a_one_hot), reduction_indices=1)
 
         # Clip the error, the loss is quadratic when the error is in (-1, 1), and linear outside of that region
-        error = tf.abs(y - q_value)
-        # error_is = (w / tf.reduce_max(w)) * error
-        quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
-        linear_part = error - quadratic_part
-        loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+        td_error = tf.stop_gradient(y) - q_value
+        errors = self.huber_loss(td_error)
+        loss = tf.reduce_mean(errors)
 
         optimizer = tf.train.RMSPropOptimizer(self.lr, decay=0.95, epsilon=1.5e-7, centered=True)
         grads_and_vars = optimizer.compute_gradients(loss, var_list=q_network_weights)
         capped_gvs = [(grad if grad is None else tf.clip_by_norm(grad, clip_norm=40), var) for grad, var in grads_and_vars]
         grad_update = optimizer.apply_gradients(capped_gvs)
 
-        #grad_update = optimizer.minimize(loss, var_list=q_network_weights)
-
-        return a, y, error, loss, grad_update ,grads_and_vars, capped_gvs
+        return a, y, tf.abs(td_error), loss, grad_update ,grads_and_vars, capped_gvs
 
     def load_network(self):
         checkpoint = tf.train.get_checkpoint_state(self.save_network_path)
@@ -242,9 +244,6 @@ class Learner:
 
     def run(self):#, server):
 
-
-
-        #print('### len sm',len(self.remote_memory))
         if self.remote_memory.length() < self.initial_memory_size:
             print("Learner Waiting...")
 
@@ -256,8 +255,7 @@ class Learner:
                 params = self.sess.run((self.q_network_weights, self.target_network_weights))
                 self.param_queue.put(params)
 
-            # print('rm len',self.remote_memory.length())
-            time.sleep(2)
+            time.sleep(4)
             return self.run()
 
         print("Learner Starts!")
@@ -310,7 +308,7 @@ class Learner:
             y_batch = reward_batch + (1 - terminal_batch) * self.gamma_n * target_q_values_batch
 
 
-            error_batch = self.error.eval(feed_dict={
+            error_batch = self.error_abs.eval(feed_dict={
                 self.s: np.float32(np.array(state_batch) / 255.0),
                 self.a: action_batch,
                 self.y: y_batch
