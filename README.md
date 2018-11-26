@@ -1,7 +1,5 @@
 # apex_dqn
-This is implementation of Ape-X DQN.
-
-Paper : [DISTRIBUTED PRIORITIZED EXPERIENCE REPLAY](https://openreview.net/pdf?id=H1Dy---0Z)
+This is TensorFlow implementation of [**Ape-X DQN** : DISTRIBUTED PRIORITIZED EXPERIENCE REPLAY](https://openreview.net/pdf?id=H1Dy---0Z)
 
 
 ## Usage
