@@ -32,7 +32,7 @@ class Actor:
                  final_epsilon=0.1):
 
         self.queue = queues[0]
-        self.param_dict = queues[1]
+        self.param_queue = queues[1]
 
 
         self.env_name = args.env_name
@@ -85,28 +85,28 @@ class Actor:
         self.buffer = []
         self.R = 0
 
-        with tf.device("/cpu:0"):
-            self.s, self.q_values, q_network = self.build_network()
+        # with tf.device("/cpu:0"):
+        self.s, self.q_values, q_network = self.build_network()
 
-            self.q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
+        self.q_network_weights = self.bubble_sort_parameters(q_network.trainable_weights)
 
-            self.st, self.target_q_values, target_network = self.build_network()
-            self.target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
+        self.st, self.target_q_values, target_network = self.build_network()
+        self.target_network_weights = self.bubble_sort_parameters(target_network.trainable_weights)
 
-            self.a, self.y, self.q, self.error = self.td_error_op()
+        self.a, self.y, self.q, self.error = self.td_error_op()
 
 
-        # while self.param_queue.empty():
+    # while self.param_queue.empty():
         #     print('Actor {} is wainting for learner params coming'.format(self.num))
         #     time.sleep(2)
         # learner_params = self.param_queue.get()
 
-        while not 0 in self.param_dict.keys():
-            time.sleep(2)
+        # while not 0 in self.param_dict.keys():
+        #     time.sleep(2)
 
 
-        learner_params = self.param_dict[0]
-        shapes = self.get_params_shape()
+        learner_params = self.param_queue.get()
+        shapes = self.get_params_shape(learner_params)
 
         self.ph_list = [tf.placeholder(tf.float32, shape=shapes[i]) for i in range(len(shapes))]
         self.target_ph_list = [tf.placeholder(tf.float32, shape=shapes[i]) for i in range(len(shapes))]
@@ -121,32 +121,21 @@ class Actor:
         self.sess.run(tf.global_variables_initializer())
 
         self.sess.run([self.obtain_q_parameters,self.obtain_target_parameters],
-                      feed_dict=self.create_feed_dict())
+                      feed_dict=self.create_feed_dict(learner_params))
 
-    def create_feed_dict(self):
+    def create_feed_dict(self, learner_params):
         feed_dict = {}
-        learner_params = self.param_dict[0]
         for i in range(len(learner_params[0])):
             feed_dict[self.ph_list[i]] = learner_params[0][i]
             feed_dict[self.target_ph_list[i]] = learner_params[1][i]
         return feed_dict
 
 
-    def get_params_shape(self):
+    def get_params_shape(self, learner_params):
         shapes = []
-        learner_params = self.param_dict[0]
         for p in learner_params[0]:
             shapes.append(p.shape)
         return shapes
-
-    def obtain_parameters(self, learner_params):
-        ph_list = [tf.placeholder(tf.float32, shape=self.shapes[i]) for i in range(len(self.shapes))]
-        target_ph_list = [tf.placeholder(tf.float32, shape=self.shapes[i]) for i in range(len(self.shapes))]
-        obtain_q_parameters = [self.q_network_weights[i].assign(ph_list[i]) for i in range(len(self.q_network_weights))]
-        obtain_target_parameters = [self.target_network_weights[i].assign(target_ph_list[i]) for i in range(len(self.target_network_weights))]
-        return ph_list, target_ph_list, obtain_q_parameters, obtain_target_parameters
-
-
 
     def bubble_sort_parameters(self, arr):
         change = True
@@ -327,16 +316,16 @@ class Actor:
                 self.t += 1
 
                 if self.t % self.param_copy_interval == 0:
-                    # while self.param_queue.empty():
-                    #     print('Actor {} is wainting for learner params coming'.format(self.num))
-                    #     time.sleep(4)
-                    # learner_params = self.param_dict[0]
+                    while self.param_queue.empty():
+                        print('Actor {} is wainting for learner params coming'.format(self.num))
+                        time.sleep(4)
+                    learner_params = self.param_queue.get()
                     # obtain_q_parameters = [self.q_network_weights[i].assign(learner_params[0][i]) for i in range(len(self.q_network_weights))]
                     # obtain_target_parameters = [self.target_network_weights[i].assign(learner_params[1][i]) for i in range(len(self.target_network_weights))]
                     # self.sess.run(obtain_q_parameters)
                     # self.sess.run(obtain_target_parameters)
                     self.sess.run([self.obtain_q_parameters,self.obtain_target_parameters],
-                                  feed_dict=self.create_feed_dict())
+                                  feed_dict=self.create_feed_dict(learner_params))
 
                 if self.anealing and self.anealing_steps + self.no_anealing_steps > self.t >= self.no_anealing_steps:
                     self.epsilon -= self.epsilon_step

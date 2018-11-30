@@ -19,7 +19,7 @@ def actor_work(args, queues, num):
 def leaner_work(args, queues):
     # with tf.device('/gpu:0'):
     sess = tf.InteractiveSession()
-    leaner = Learner(args, queues, sess, print_interval=3)
+    leaner = Learner(args, queues, sess, print_interval=10)
     leaner.run()
 
 
@@ -50,23 +50,34 @@ if __name__ == '__main__':
     if args.train:
         transition_queue = mp.Queue(100)
 
-        param_queue = 1 #mp.Queue(args.num_actors)
+        param_dict = mp.Queue(args.num_actors)
+        ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_dict)))]
+
+        for i in range(args.num_actors):
+            ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_dict), i)))
+
+        for p in ps:
+            p.start()
+            time.sleep(0.5)
+
+        for p in ps:
+            p.join()
 
         # with tf.device("/cpu:0"):
-        with mp.Manager() as manager:
-            param_dict = manager.dict()
-
-            ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_dict)))]
-
-            for i in range(args.num_actors):
-                ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_dict), i)))
-
-            for p in ps:
-                p.start()
-                time.sleep(0.5)
-
-            for p in ps:
-                p.join()
+        # with mp.Manager() as manager:
+        #     param_dict = manager.dict()
+        #
+        #     ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_dict)))]
+        #
+        #     for i in range(args.num_actors):
+        #         ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_dict), i)))
+        #
+        #     for p in ps:
+        #         p.start()
+        #         time.sleep(0.5)
+        #
+        #     for p in ps:
+        #         p.join()
 
     # Test Mode
     # else:
