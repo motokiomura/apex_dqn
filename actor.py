@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 
 import gym
@@ -48,7 +50,7 @@ class Actor:
         self.param_copy_interval = param_copy_interval
         self.send_size = send_size
         self.action_interval = action_interval
-        self.no_op_step = no_op_steps
+        self.no_op_steps = no_op_steps
 
         self.epsilon = epsilon
         self.alpha = alpha
@@ -95,16 +97,6 @@ class Actor:
 
         self.a, self.y, self.q, self.error = self.td_error_op()
 
-
-    # while self.param_queue.empty():
-        #     print('Actor {} is wainting for learner params coming'.format(self.num))
-        #     time.sleep(2)
-        # learner_params = self.param_queue.get()
-
-        # while not 0 in self.param_dict.keys():
-        #     time.sleep(2)
-
-
         learner_params = self.param_queue.get()
         shapes = self.get_params_shape(learner_params)
 
@@ -112,9 +104,6 @@ class Actor:
         self.target_ph_list = [tf.placeholder(tf.float32, shape=shapes[i]) for i in range(len(shapes))]
         self.obtain_q_parameters = [self.q_network_weights[i].assign(self.ph_list[i]) for i in range(len(self.q_network_weights))]
         self.obtain_target_parameters = [self.target_network_weights[i].assign(self.target_ph_list[i]) for i in range(len(self.target_network_weights))]
-
-        # obtain_q_parameters = [self.q_network_weights[i].assign(learner_params[0][i]) for i in range(len(self.q_network_weights))]
-        # obtain_target_parameters = [self.target_network_weights[i].assign(learner_params[1][i]) for i in range(len(self.target_network_weights))]
 
         self.sess = sess
 
@@ -209,20 +198,20 @@ class Actor:
             self.repeated_action = action
 
         return action, q[0]
-    #
-    # def get_action_at_test(self, state):
-    #     action = self.repeated_action
-    #
-    #     if self.t % ACTION_INTERVAL == 0:
-    #         if random.random() <= 0.05:
-    #             action = random.randrange(self.num_actions)
-    #         else:
-    #             action = np.argmax(self.q_values.eval(feed_dict={self.s: [np.float32(state / 255.0)]}))
-    #         self.repeated_action = action
-    #
-    #     self.t += 1
-    #
-    #     return action
+
+    def get_action_at_test(self, state):
+        action = self.repeated_action
+
+        if self.t % self.action_interval == 0:
+            if random.random() <= 0.05:
+                action = random.randrange(self.num_actions)
+            else:
+                action = np.argmax(self.q_values.eval(feed_dict={self.s: [np.float32(state / 255.0)]}))
+            self.repeated_action = action
+
+        self.t += 1
+
+        return action
 
     def get_sample(self, n):
         s, a, _, _, _, q = self.buffer[0]
@@ -234,7 +223,7 @@ class Actor:
         for _ in range(self.num_episodes):
             terminal = False
             observation = self.env.reset()
-            for _ in range(random.randint(1, self.no_op_step)):
+            for _ in range(random.randint(1, self.no_op_steps)):
                 last_observation = observation
                 observation, _, _, _ = self.env.step(0)  # Do nothing
             state = self.get_initial_state(observation, last_observation)
@@ -244,9 +233,9 @@ class Actor:
                 last_observation = observation
                 action, q = self.get_action_and_q(state)
 
-                observation, reward, terminal, _ = self.env.step(action)
-                reward = np.sign(reward)
-                # self.env.render()
+                observation, reward_ori, terminal, _ = self.env.step(action)
+                reward = np.sign(reward_ori)
+                self.env.render(mode='rgb_array')
                 processed_observation = self.preprocess(observation, last_observation)
                 next_state = np.append(state[1:, :, :], processed_observation, axis=0)
 
@@ -320,17 +309,13 @@ class Actor:
                         print('Actor {} is wainting for learner params coming'.format(self.num))
                         time.sleep(4)
                     learner_params = self.param_queue.get()
-                    # obtain_q_parameters = [self.q_network_weights[i].assign(learner_params[0][i]) for i in range(len(self.q_network_weights))]
-                    # obtain_target_parameters = [self.target_network_weights[i].assign(learner_params[1][i]) for i in range(len(self.target_network_weights))]
-                    # self.sess.run(obtain_q_parameters)
-                    # self.sess.run(obtain_target_parameters)
                     self.sess.run([self.obtain_q_parameters,self.obtain_target_parameters],
                                   feed_dict=self.create_feed_dict(learner_params))
 
                 if self.anealing and self.anealing_steps + self.no_anealing_steps > self.t >= self.no_anealing_steps:
                     self.epsilon -= self.epsilon_step
 
-                self.total_reward += reward
+                self.total_reward += reward_ori
                 self.total_q_max += np.max(self.q_values.eval(feed_dict={self.s: [np.float32(state / 255.0)]}, session=self.sess))
                 self.duration += 1
 

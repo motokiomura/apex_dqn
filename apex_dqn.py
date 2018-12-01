@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import os
 import multiprocessing as mp
@@ -5,6 +7,8 @@ import tensorflow as tf
 import numpy as np
 import argparse
 import time
+import gym
+import random
 
 from actor import Actor
 from learner import Learner
@@ -19,7 +23,7 @@ def actor_work(args, queues, num):
 def leaner_work(args, queues):
     # with tf.device('/gpu:0'):
     sess = tf.InteractiveSession()
-    leaner = Learner(args, queues, sess, print_interval=10)
+    leaner = Learner(args, queues, sess)
     leaner.run()
 
 
@@ -29,7 +33,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_actors', type=int, default=4)
     parser.add_argument('--env_name', type=str, default='Alien-v0')
     parser.add_argument('--train', type=int, default=1)
+    parser.add_argument('--test_gui', type=int, default=0)
     parser.add_argument('--load', type=int, default=0)
+    parser.add_argument('--network_path', type=str, default=0)
     parser.add_argument('--replay_memory_size', type=int, default=2000000)
     parser.add_argument('--initial_memory_size', type=int, default=20000, help='Learner waits until RB stores this number of transition.')
     parser.add_argument('--num_episodes', type=int, default=10000, help='Number of episodes each agent plays')
@@ -41,11 +47,17 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # if args.train:
-    #     assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
-    #
-    # if not args.load:
-    #     assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
+    if args.network_path == 0:
+        args.network_path = 'saved_networks/' + args.env_name
+
+    if not os.path.exists(args.network_path):
+        os.makedirs(args.network_path)
+
+    if args.train:
+        assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
+
+    if not args.load:
+        assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
 
     if args.train:
         transition_queue = mp.Queue(100)
@@ -63,41 +75,37 @@ if __name__ == '__main__':
         for p in ps:
             p.join()
 
-        # with tf.device("/cpu:0"):
-        # with mp.Manager() as manager:
-        #     param_dict = manager.dict()
-        #
-        #     ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_dict)))]
-        #
-        #     for i in range(args.num_actors):
-        #         ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_dict), i)))
-        #
-        #     for p in ps:
-        #         p.start()
-        #         time.sleep(0.5)
-        #
-        #     for p in ps:
-        #         p.join()
-
     # Test Mode
-    # else:
-    #     env = gym.make(ENV_NAME)
-    #     env = wrappers.Monitor(env, SAVE_NETWORK_PATH, force=True)
-    #     sess = tf.InteractiveSession()
-    #     agent = Actor(number=0,sess=sess)
-    #     for _ in range(NUM_EPISODES_AT_TEST):
-    #         terminal = False
-    #         observation = env.reset()
-    #         for _ in range(random.randint(1, NO_OP_STEPS)):
-    #             last_observation = observation
-    #             observation, _, _, _ = env.step(0)  # Do nothing
-    #         state = agent.get_initial_state(observation, last_observation)
-    #         while not terminal:
-    #             last_observation = observation
-    #             action = agent.get_action_at_test(state)
-    #             observation, _, terminal, _ = env.step(action)
-    #             env.render()
-    #             processed_observation = agent.preprocess(observation, last_observation)
-    #             state =np.append(state[1:, :, :], processed_observation, axis=0)
+    else:
+        from test_agent import Agent
+        env = gym.make(args.env_name)
+        env = gym.wrappers.Monitor(env, args.network_path, force=True)
+        sess = tf.InteractiveSession()
+        agent = Agent(args, sess)
+        t = 0
+        total_reward = 0
+        for episode in range(10):
+            terminal = False
+            observation = env.reset()
+            for _ in range(random.randint(1, agent.no_op_steps)):
+                last_observation = observation
+                observation, _, _, _ = env.step(0)  # Do nothing
+            state = agent.get_initial_state(observation, last_observation)
+            while not terminal:
+                last_observation = observation
+                action = agent.get_action_at_test(state)
+                observation, reward, terminal, _ = env.step(action)
+                if args.test_gui:
+                    env.render()
+                processed_observation = agent.preprocess(observation, last_observation)
+                state =np.append(state[1:, :, :], processed_observation, axis=0)
+                total_reward += reward
+                t += 1
+
+            text = 'EPISODE: {0:6d} / DURATION: {1:5d} / EPSILON: {2:.5f} / TOTAL_REWARD: {3:3.0f}'.format(
+                episode + 1, t, agent.test_epsilon, total_reward)
+            print(text)
+            total_reward = 0
+            t = 0
 
 

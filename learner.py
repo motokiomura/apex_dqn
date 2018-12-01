@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import os
 import gym
@@ -92,6 +94,7 @@ class Learner:
 
         self.env_name = args.env_name
         self.load = args.load
+        self.save_network_path = args.network_path
         self.replay_memory_size = args.replay_memory_size
         self.initial_memory_size = args.initial_memory_size
         self.frame_width = args.frame_width
@@ -115,7 +118,6 @@ class Learner:
 
         self.remote_memory = Memory(self.replay_memory_size)
 
-        self.save_network_path = 'saved_networks/' + self.env_name
 
         self.num_actions = gym.make(args.env_name).action_space.n
 
@@ -154,12 +156,6 @@ class Learner:
         self.sess = sess
         self.sess.run(tf.global_variables_initializer())
 
-        while not self.param_queue.full():
-            params = self.sess.run((self.q_network_weights, self.target_network_weights))
-            self.param_queue.put(params)
-
-        # self.param_dict[0] = self.sess.run((self.q_network_weights, self.target_network_weights))
-
         with tf.device("/cpu:0"):
             self.saver = tf.train.Saver(self.q_network_weights)
 
@@ -167,8 +163,15 @@ class Learner:
         if self.load:
             self.load_network()
 
-        if not os.path.exists(self.save_network_path):
-            os.makedirs(self.save_network_path)
+        params = self.sess.run((self.q_network_weights, self.target_network_weights))
+        while not self.param_queue.full():
+            self.param_queue.put(params)
+
+        # self.param_dict[0] = self.sess.run((self.q_network_weights, self.target_network_weights))
+
+
+        # if not os.path.exists(self.save_network_path):
+        #     os.makedirs(self.save_network_path)
 
 
         # Initialize target network
@@ -254,9 +257,10 @@ class Learner:
                 t_error = self.queue.get()
                 self.remote_memory.add(t_error[0], t_error[1])
 
-            while not self.param_queue.full():
+            if not self.param_queue.full():
                 params = self.sess.run((self.q_network_weights, self.target_network_weights))
-                self.param_queue.put(params)
+                while not self.param_queue.full():
+                    self.param_queue.put(params)
 
             time.sleep(4)
             return self.run()
@@ -281,16 +285,13 @@ class Learner:
                     t_error = self.queue.get()
                     self.remote_memory.add(t_error[0], t_error[1])
 
-            # self.param_dict[0] = self.sess.run((self.q_network_weights, self.target_network_weights))
-
-            while not self.param_queue.full():
+            if not self.param_queue.full():
                 params = self.sess.run((self.q_network_weights, self.target_network_weights))
-                self.param_queue.put(params)
+                while not self.param_queue.full():
+                    self.param_queue.put(params)
 
 
-            # print('rm len',self.remote_memory.length())
             minibatch, idx_batch = self.remote_memory.sample(self.batch_size)
-            #print("mini\n", minibatch[0][0])
 
             for data in minibatch:
                 state_batch.append(data[0])
