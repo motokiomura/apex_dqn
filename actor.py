@@ -321,7 +321,7 @@ class Actor:
 
             elapsed = time.time() - start
 
-            text = 'EPISODE: {0:6d} / ACTOR: {1:3d} / TIMESTEP: {2:8d} / DURATION: {3:5d} / EPSILON: {4:.5f} / TOTAL_REWARD: {5:3.0f} / AVG_MAX_Q: {6:2.4f} / STEP_PER_SECOND: {7:.1f}'.format(
+            text = 'EPISODE: {0:6d} / ACTOR: {1:3d} / TOTAL_STEPS: {2:8d} / STEPS: {3:5d} / EPSILON: {4:.5f} / TOTAL_REWARD: {5:3.0f} / MAX_Q_AVG: {6:2.4f} / STEPS_PER_SECOND: {7:.1f}'.format(
                 self.episode + 1, self.num, self.t, self.duration, self.epsilon,
                 self.total_reward, self.total_q_max / float(self.duration),
                 self.duration/elapsed)

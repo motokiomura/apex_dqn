@@ -49,13 +49,11 @@ if __name__ == '__main__':
 
     if args.network_path == 0:
         args.network_path = 'saved_networks/' + args.env_name
-
     if not os.path.exists(args.network_path):
         os.makedirs(args.network_path)
 
     if args.train:
         assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
-
     if not args.load:
         assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
 
@@ -102,7 +100,7 @@ if __name__ == '__main__':
                 total_reward += reward
                 t += 1
 
-            text = 'EPISODE: {0:6d} / DURATION: {1:5d} / EPSILON: {2:.5f} / TOTAL_REWARD: {3:3.0f}'.format(
+            text = 'EPISODE: {0:6d} / STEPS: {1:5d} / EPSILON: {2:.5f} / TOTAL_REWARD: {3:3.0f}'.format(
                 episode + 1, t, agent.test_epsilon, total_reward)
             print(text)
             total_reward = 0
