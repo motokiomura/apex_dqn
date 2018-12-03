@@ -23,7 +23,7 @@ def actor_work(args, queues, num):
 def leaner_work(args, queues):
     # with tf.device('/gpu:0'):
     sess = tf.InteractiveSession()
-    leaner = Learner(args, queues, sess)
+    leaner = Learner(args, queues, sess, batch_size=126)
     leaner.run()
 
 

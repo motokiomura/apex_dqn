@@ -11,68 +11,57 @@ from keras.models import Model
 from keras.layers import Conv2D, Flatten, Dense, Input, Lambda, concatenate
 from keras import backend as K
 import time
+from SumTree import SumTree
 
 
-class Memory:
-    def __init__(self, size):
-        self.transition = deque()
-        self.priorities = deque()
-        self.size = size
-        self.total_p = 0
+class Memory:   # stored as ( s, a, r, s_ ) in SumTree
+    e = 0.0
+    a = 0.6
 
+    def __init__(self, capacity):
+        self.tree = SumTree(capacity)
+        self.max_p = 1
 
-        self.alpha = 0.6
-
-    def _error_to_priority(self, error_batch):
-        priority_batch = []
-        for error in error_batch:
-            priority_batch.append(error**self.alpha)
-        return priority_batch
+    def _getPriority(self, error):
+        return (error + self.e) ** self.a
 
     def length(self):
-        return len(self.transition)
+        return self.tree.write
 
-    def add(self, transiton_batch, error_batch):
-        priority_batch = self._error_to_priority(error_batch)
-        self.total_p += sum(priority_batch)
-        self.transition.extend(transiton_batch)
-        self.priorities.extend(priority_batch)
+    def add(self, sample, error):
+        p = self._getPriority(error)
+        self.tree.add(p, sample)
+
+    def add_p(self, p, sample):
+        self.tree.add(p, sample)
 
     def sample(self, n):
         batch = []
         idx_batch = []
-        segment = self.total_p / n
+        segment = self.tree.total() / n
 
-        idx = -1
-        sum_p = 0
         for i in range(n):
             a = segment * i
             b = segment * (i + 1)
 
             s = random.uniform(a, b)
-            while sum_p < s:
-                sum_p += self.priorities[idx]
-                idx += 1
+            (idx, p, data) = self.tree.get(s)
+            batch.append(data)
             idx_batch.append(idx)
-            batch.append(self.transition[idx])
+
         return batch, idx_batch
 
+    def update(self, idx, error):
+        p = self._getPriority(error)
+        if p > self.max_p:
+            self.max_p = p
+        self.tree.update(idx, p)
 
-    def update(self, idx_batch, error_batch):
-        priority_batch = self._error_to_priority(error_batch)
-        for i in range(len(idx_batch)):
-            change = priority_batch[i] - self.priorities[idx_batch[i]]
-            self.total_p += change
-            self.priorities[idx_batch[i]] = priority_batch[i]
-
-
-    def remove(self):
-        print("Excess Memory: ", (len(self.priorities) - self.size))
-        #[self.transition.popleft() for _ in range(len(self.transition) - NUM_REPLAY_MEMORY)]
-        for _ in range(len(self.priorities) - self.size):
-            self.transition.popleft()
-            p = self.priorities.popleft()
-            self.total_p -= p
+    def update_batch(self, idx_batch, error_batch):
+        p_batch = self._getPriority(error_batch)
+        if np.max(p_batch) > self.max_p:
+            self.max_p = np.max(p_batch)
+        self.tree.update_batch(idx_batch, p_batch)
 
 
 
@@ -85,7 +74,7 @@ class Learner:
                  sess,
                  target_update_interval=2500,
                  memory_remove_interval=100,
-                 batch_size=32,
+                 batch_size=512,
                  lr=0.00025/4,
                  save_interval=50000,
                  print_interval=100,
@@ -166,12 +155,6 @@ class Learner:
         params = self.sess.run((self.q_network_weights, self.target_network_weights))
         while not self.param_queue.full():
             self.param_queue.put(params)
-
-        # self.param_dict[0] = self.sess.run((self.q_network_weights, self.target_network_weights))
-
-
-        # if not os.path.exists(self.save_network_path):
-        #     os.makedirs(self.save_network_path)
 
 
         # Initialize target network
@@ -255,7 +238,8 @@ class Learner:
 
             while not self.queue.empty():
                 t_error = self.queue.get()
-                self.remote_memory.add(t_error[0], t_error[1])
+                for i in range(len(t_error[0])):
+                    self.remote_memory.add(t_error[0][i], t_error[1][i])
 
             if not self.param_queue.full():
                 params = self.sess.run((self.q_network_weights, self.target_network_weights))
@@ -283,7 +267,8 @@ class Learner:
                 self.no_added_count = 0
                 while not self.queue.empty():
                     t_error = self.queue.get()
-                    self.remote_memory.add(t_error[0], t_error[1])
+                    for i in range(len(t_error[0])):
+                        self.remote_memory.add(t_error[0][i], t_error[1][i])
 
             if not self.param_queue.full():
                 params = self.sess.run((self.q_network_weights, self.target_network_weights))
@@ -333,7 +318,7 @@ class Learner:
             self.total_time += time.time() - start
 
             # Memory update
-            self.remote_memory.update(idx_batch, error_batch)
+            [self.remote_memory.update(idx_batch[i],error_batch[i]) for i in range(len(idx_batch))]
 
             self.t += 1
 
@@ -349,8 +334,8 @@ class Learner:
                 self.total_q_max = 0
 
             # Remove excess memory
-            if self.t % self.memory_remove_interval == 0 and self.remote_memory.length() > self.replay_memory_size:
-                self.remote_memory.remove()
+            # if self.t % self.memory_remove_interval == 0 and self.remote_memory.length() > self.replay_memory_size:
+            #     self.remote_memory.remove()
 
             # Update target network
             if self.t % self.target_update_interval == 0:

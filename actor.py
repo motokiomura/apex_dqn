@@ -297,7 +297,6 @@ class Actor:
                     }, session=self.sess)
 
                     send = [(state_batch[i],action_batch[i],reward_batch[i],next_state_batch[i],terminal_batch[i]) for i in range(self.send_size)]
-
                     self.queue.put((send,error_batch))
 
                 state = next_state
