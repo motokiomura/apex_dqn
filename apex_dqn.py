@@ -49,13 +49,13 @@ if __name__ == '__main__':
 
     if args.network_path == 0:
         args.network_path = 'saved_networks/' + args.env_name
+    if not args.load:
+        assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
     if not os.path.exists(args.network_path):
         os.makedirs(args.network_path)
 
     if args.train:
         assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
-    if not args.load:
-        assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
 
     if args.train:
         transition_queue = mp.Queue(100)
