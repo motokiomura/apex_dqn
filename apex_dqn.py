@@ -60,11 +60,11 @@ if __name__ == '__main__':
     if args.train:
         transition_queue = mp.Queue(100)
 
-        param_dict = mp.Queue(args.num_actors)
-        ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_dict)))]
+        param_queue = mp.Queue(args.num_actors)
+        ps = [mp.Process(target=leaner_work, args=(args, (transition_queue, param_queue)))]
 
         for i in range(args.num_actors):
-            ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_dict), i)))
+            ps.append(mp.Process(target=actor_work, args=(args, (transition_queue, param_queue), i)))
 
         for p in ps:
             p.start()
