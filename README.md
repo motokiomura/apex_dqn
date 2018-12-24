@@ -1,5 +1,10 @@
-# apex_dqn
-This is TensorFlow implementation of [**Ape-X DQN** : DISTRIBUTED PRIORITIZED EXPERIENCE REPLAY](https://openreview.net/pdf?id=H1Dy---0Z)
+# Ape-X DQN
+This is TensorFlow implementation of **Ape-X DQN** : [DISTRIBUTED PRIORITIZED EXPERIENCE REPLAY](https://openreview.net/pdf?id=H1Dy---0Z)
+
+
+In my code, 
+`multiprocessing` is adopted to implement distribution of a learner and actors, and
+`multiprocessing.Queue` is used to pass network parameters and trajectories among processes.
 
 Environment : 
 [OpenAI Gym Atari 2600 games](https://gym.openai.com/envs/#atari)
