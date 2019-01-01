@@ -3,7 +3,7 @@ This is TensorFlow implementation of **Ape-X DQN** : [DISTRIBUTED PRIORITIZED EX
 
 
 In my code, 
-`multiprocessing` is adopted to implement distribution of a learner and actors, and
+`multiprocessing` is adopted to implement distribution of a learner and actors and
 `multiprocessing.Queue` is used to pass network parameters and trajectories among processes.
 
 Environment : 
