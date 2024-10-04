@@ -27,15 +27,14 @@ def leaner_work(args, queues):
     leaner.run()
 
 
-# Train Mode
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_actors', type=int, default=4, help='number of Actors')
     parser.add_argument('--env_name', type=str, default='Alien-v0', help='Environment of Atari2600 games')
-    parser.add_argument('--train', type=int, default=1, help='train mode or test mode')
-    parser.add_argument('--test_gui', type=int, default=0, help='decide whether you use GUI or not in test mode')
-    parser.add_argument('--load', type=int, default=0, help='loading saved network')
-    parser.add_argument('--network_path', type=str, default=0, help='used in loading and saving (default: \'saved_networks/<env_name>\')')
+    parser.add_argument('--test', action='store_true', help='train mode or test mode')
+    parser.add_argument('--test_gui', action='store_true', help='decide whether you use GUI or not in test mode')
+    parser.add_argument('--load', action='store_true', help='loading saved network')
+    parser.add_argument('--network_path', type=str, default=None, help='used in loading and saving (default: \'saved_networks/<env_name>\')')
     parser.add_argument('--replay_memory_size', type=int, default=2000000, help='replay memory size')
     parser.add_argument('--initial_memory_size', type=int, default=20000, help='Learner waits until replay memory stores this number of transition')
     parser.add_argument('--num_episodes', type=int, default=10000, help='number of episodes each agent plays')
@@ -47,17 +46,17 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.network_path == 0:
+    if not args.network_path:
         args.network_path = 'saved_networks/' + args.env_name
     if not args.load:
         assert not os.path.exists('saved_networks/'+args.env_name), 'Saved network already exists.'
     if not os.path.exists(args.network_path):
         os.makedirs(args.network_path)
 
-    if args.train:
+    if not args.test:
         assert not os.path.exists(args.env_name+'_output.txt'), 'Output file already exists. Change file name.'
 
-    if args.train:
+    if not args.test:
         transition_queue = mp.Queue(100)
 
         param_queue = mp.Queue(args.num_actors)
